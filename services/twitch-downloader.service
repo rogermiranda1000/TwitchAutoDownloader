@@ -1,0 +1,13 @@
+[Unit]
+Description=Twitch Auto Downloader
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/rogermiranda1000/TwitchAutoDownloader
+ExecStart=/home/rogermiranda1000/anaconda3/envs/twitch/bin/python3 -u TwitchDownloader.py
+Restart=on-failure
+RestartSec=20s
+
+[Install]
+WantedBy=multi-user.target
