@@ -1,5 +1,14 @@
 import re
+import os,shutil
+import subprocess
+import logging
 from typing import Any,Dict
+
+class InvalidQualityException(Exception):
+    def __init__(self, message="Invalid quality for this video.", valid_qualities=None):
+        if valid_qualities is not None:
+            message += " Valid qualities are: " + str(valid_qualities)
+        super().__init__(message)
 
 class VideoDownloader:
     @staticmethod
@@ -14,6 +23,19 @@ class VideoDownloader:
     @staticmethod
     def get_url(id: str) -> str:
         return f"https://www.twitch.tv/videos/{id}"
+
+    @staticmethod
+    def move_and_reformat(from_path: str, to_path: str):
+        _, from_extension = os.path.splitext(from_path)
+        _, to_extension = os.path.splitext(to_path)
+
+        if from_extension == to_extension:
+            shutil.move(from_path, to_path)
+        else:
+            logging.debug(f"Reformatting in progress...")
+            result = subprocess.run(['ffmpeg', '-i', from_path, to_path], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            logging.debug(f"Result of reformatting: ```{result}```")
+            os.remove(from_path) # ffmpeg won't remove the old file
 
     def download(self, id_or_url: str, quality: str, out_path: str):
         """

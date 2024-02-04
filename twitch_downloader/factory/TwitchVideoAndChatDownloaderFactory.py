@@ -1,6 +1,9 @@
 from typing import Dict,Any
+from time import sleep
+import logging
+import os
 from .TwitchDownloaderFactory import TwitchDownloaderFactory
-from ..VideoDownloader import VideoDownloader
+from ..VideoDownloader import VideoDownloader,InvalidQualityException
 from ..chat.ChatDownloader import ChatDownloader
 from ..video.TwitchDlDownloader import TwitchDlDownloader
 
@@ -13,7 +16,24 @@ class VideoAndChatDownloader(VideoDownloader):
         self._chat_downloader = chat_downloader
 
     def download(self, id_or_url: str, quality: str, out_path: str):
-        self._twitchdl_downloader.download(id_or_url, quality, out_path)
+        # there's a bug with TwitchDl where sometimes the quality disappears, and another where the program crashes and it needs to be launched again; we'll try some times
+        tries = 0
+        max_tries = 4
+        while tries < max_tries:
+            try:
+                self._twitchdl_downloader.download(id_or_url, quality, out_path)
+                if not os.path.isfile(out_path):
+                    raise Exception("Couldn't find file at its expected path.")
+                break # downloaded succesfully
+            except InvalidQualityException as ex: # retrying with other exceptions could be bad
+                tries += 1
+                if tries >= max_tries:
+                    raise ex # reached max retries
+                else:
+                    # try again after some time
+                    logging.debug("Got an " + ex.__class__.__name__ + "; trying again to make sure it's not a false-negative.")
+                    logging.debug(ex, exc_info=True)
+                    sleep(8)
 
     def get_info(self, id_or_url: str) -> Dict[str,Any]:
         return self._twitchdl_downloader.get_info(id_or_url)

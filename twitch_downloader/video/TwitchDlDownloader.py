@@ -1,4 +1,4 @@
-from ..VideoDownloader import VideoDownloader
+from ..VideoDownloader import VideoDownloader,InvalidQualityException
 from typing import Any,Dict,List
 import os
 import re
@@ -15,7 +15,22 @@ class TwitchDlDownloader(VideoDownloader):
         return result.stdout.decode('utf-8')
 
     def download(self, id_or_url: str, quality: str, out_path: str):
-        url = VideoDownloader.get_url(VideoDownloader.get_id(id_or_url))
+        id = VideoDownloader.get_id(id_or_url)
+        result = self._run_command('download', id, '--quality', quality)
+        logging.debug(f"Result of the download command: ```{result}```")
+        result = TwitchDlDownloader._escape_ansi(result)
+
+        invalid_quality_pattern = re.compile(r'Quality \'' + re.escape(quality) + r'\' not found. Available qualities are: (.+)')
+        invalid_quality_match = invalid_quality_pattern.search(result)
+        if invalid_quality_match:
+            raise InvalidQualityException(valid_qualities=invalid_quality_match.group(1).split(', '))
+
+        ok_pattern = re.compile(r'Downloaded: (.+\.mkv)')
+        ok_match = ok_pattern.search(result)
+        if not ok_match:
+            raise Exception(result) # something wrong happened
+            
+        VideoDownloader.move_and_reformat(ok_match.group(1), out_path)
 
     @staticmethod
     def _escape_ansi(line: str):

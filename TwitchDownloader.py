@@ -1,7 +1,15 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import os
 import asyncio
 import logging
 import time
+import shutil
+import tempfile
+import signal
+import sys
+from pathlib import Path
 from datetime import datetime,timedelta
 from enum import Enum
 from config.ConfigManager import JsonConfig,ConfigProvider
@@ -17,13 +25,54 @@ class TwitchDownloader:
     def __init__(self, config: ConfigProvider, video_downloader_factory: VideoDownloader):
         self._config = config
         self._video_downloader = video_downloader_factory.build()
+        self._tmp_dir = tempfile.TemporaryDirectory()
         self._start = False
 
+        self._videos_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'videos')
+        Path(self._videos_folder).mkdir(parents=True, exist_ok=True)
+
     def _download(self, id: str, tmp: bool = False):
-        pass
+        # If we're capturing a temporal video, we must store the last 3 videos. Explanation:
+        # Let's assume we're capturing a video and we store it as "A.mp4"
+        # Then, we'll trigger another download 1 second before the video ends, this is "B.mp4"
+        # and as the download will last more than 1 second it is invalid, because there's a
+        # potential data loss.
+        # Finally, as the download was started before it ended we'll trigger this function
+        # one last time, downloading "C.mp4".
+        # In the next tick the program will realize that C.mp4 is the complete stream, and will
+        # merge it (if enabled) with the uncompleted one. In this case, we want to pick "A.mp4".
+
+        target_path = os.path.join(self._videos_folder, id + ".mkv") # TODO mp4
+        tmp_target_path_gen = lambda n : os.path.join(self._tmp_dir, id + "." + str(n) + ".mkv") # mkv extension requires less operations
+        if tmp:
+            # move "B" and "C" (if they exist)
+            shutil.move(tmp_target_path_gen(2), tmp_target_path_gen(1))
+            shutil.move(tmp_target_path_gen(3), tmp_target_path_gen(2))
+            # we're writting on "C"
+            target_path = tmp_target_path_gen(3)
+        else:
+            # if we got "C", then we can export it directly
+            if os.path.isfile(tmp_target_path_gen(3)):
+                logging.debug("Re-using latest tmp video.")
+                VideoDownloader.move_and_reformat(tmp_target_path_gen(3), target_path)
+                return # we got it
+            # we weren't downloading tmp files; download the final video
+
+        self._video_downloader.download(id, self._config.download_quality, target_path)
+
 
     def _merge(self, id: str):
-        pass
+        target_path = os.path.join(self._videos_folder, id + ".mkv") # TODO mp4
+        tmp_target_path_gen = lambda n : os.path.join(self._tmp_dir, id + "." + str(n) + ".mkv")
+        to_merge = tmp_target_path_gen(1)
+
+        if not os.path.isfile(to_merge):
+            logging.debug("Nothing to merge.")
+            return
+
+        logging.debug(f"Merging '{to_merge}' with '{target_path}'...")
+        # TODO merge instead of this
+        VideoDownloader.move_and_reformat(to_merge, os.path.join(self._videos_folder, "start_" + id + ".mkv"))
 
     def __tick(self):
         if self._state == TwitchDownloader.TwitchDownloaderState.WAITING_FOR_VIDEO:
@@ -32,6 +81,7 @@ class TwitchDownloader:
             last_id_info = None if last_id is None else self._video_downloader.get_info(last_id)
             if last_id is not None:
                 if self._last_time < last_id_info['published']:
+                    # new video found
                     logging.info("Found a new video! Starting to capture...")
                     self._current_video = last_id
                     self._current_video_duration = timedelta(0) # simulate that we've captured this video when it was 0 seconds long
@@ -40,7 +90,7 @@ class TwitchDownloader:
                     # as now we've changed the stage, capture what we've already got
                     self.__tick()
                 else:
-                    logging.debug(f"No new video got.")
+                    logging.debug("No new video got.")
         elif self._state == TwitchDownloader.TwitchDownloaderState.CAPTURING:
             current_video_info = self._video_downloader.get_info(self._current_video)
             if self._current_video_duration < current_video_info['length']:
@@ -49,6 +99,7 @@ class TwitchDownloader:
                 
                 if self._config.download_while_stream:
                     self._download(self._current_video, tmp=True)
+                    logging.debug(f"Overriden latest video for the new one.")
                     
                 self._current_video_duration = current_video_info['length'] # update the current downloaded length
             else:
@@ -117,9 +168,11 @@ class TwitchDownloader:
 
     def stop(self):
         self._start = False
+        self._tmp_dir.cleanup()
 
 
 async def main():
+    global downloader
     config = JsonConfig(os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json"))
 
     # TODO forward logger msg to Discord
@@ -132,8 +185,16 @@ async def main():
 
     await downloader.run()
 
+def signal_handler(sig, frame):
+    global downloader
+    print('Got SIGINT; cleaning...')
+    downloader.stop()
+    sys.exit(0) # TODO abort sleep instead of exiting
+
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
-    
+
+    signal.signal(signal.SIGINT, signal_handler)
+
     loop = asyncio.get_event_loop()
     loop.run_until_complete(main())

@@ -1,8 +1,14 @@
 #
 # Repository
 #
+
+# config file
 config.json
+
+# videos
 videos/*
+*.mkv
+*.mp4
 
 
 #
@@ -20,6 +26,7 @@ videos/*
 
 # Built Visual Studio Code Extensions
 *.vsix
+
 
 #
 # Python
