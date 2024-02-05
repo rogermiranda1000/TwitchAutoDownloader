@@ -25,7 +25,7 @@ class TwitchDownloader:
     def __init__(self, config: ConfigProvider, video_downloader_factory: VideoDownloader):
         self._config = config
         self._video_downloader = video_downloader_factory.build()
-        self._tmp_dir = tempfile.TemporaryDirectory()
+        self._tmp_dir = str(tempfile.TemporaryDirectory())
         self._start = False
 
         self._videos_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'videos')

@@ -60,7 +60,7 @@ class TwitchDlDownloader(VideoDownloader):
             length_pattern = re.compile(r'(?:(\d+) h)?\s*(\d+) min')
             length_match = length_pattern.search(info_match.group(3))
             if length_match:
-                r['length'] = timedelta(minutes=int(length_match.group(2)), hours=int("0" if len(length_match.group(1)) == 0 else length_match.group(1)))
+                r['length'] = timedelta(minutes=int(length_match.group(2)), hours=int("0" if length_match.group(1) is None else length_match.group(1)))
 
         return r
 
