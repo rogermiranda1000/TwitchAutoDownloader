@@ -31,6 +31,13 @@ class TwitchDownloader:
         self._videos_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'videos')
         Path(self._videos_folder).mkdir(parents=True, exist_ok=True)
 
+    @staticmethod
+    def move_if_exists(from_path: str, to_path: str):
+        try:
+            shutil.move(from_path, to_path)
+        except FileNotFoundError:
+            pass
+
     def _download(self, id: str, tmp: bool = False):
         # If we're capturing a temporal video, we must store the last 3 videos. Explanation:
         # Let's assume we're capturing a video and we store it as "A.mp4"
@@ -46,8 +53,8 @@ class TwitchDownloader:
         tmp_target_path_gen = lambda n : os.path.join(self._tmp_dir, id + "." + str(n) + ".mkv") # mkv extension requires less operations
         if tmp:
             # move "B" and "C" (if they exist)
-            shutil.move(tmp_target_path_gen(2), tmp_target_path_gen(1))
-            shutil.move(tmp_target_path_gen(3), tmp_target_path_gen(2))
+            TwitchDownloaderState.move_if_exists(tmp_target_path_gen(2), tmp_target_path_gen(1))
+            TwitchDownloaderState.move_if_exists(tmp_target_path_gen(3), tmp_target_path_gen(2))
             # we're writting on "C"
             target_path = tmp_target_path_gen(3)
         else:
