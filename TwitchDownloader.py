@@ -90,7 +90,7 @@ class TwitchDownloader:
             last_id = self._video_downloader.get_last_video(self._config.channel_name)
             self._last_id_info = None if last_id is None else self._video_downloader.get_info(last_id)
             if last_id is not None:
-                if self._last_time < last_id_info['published']:
+                if self._last_time < self._last_id_info['published']:
                     # new video found
                     logging.info("Found a new video! Starting to capture...")
                     self._current_video = last_id
