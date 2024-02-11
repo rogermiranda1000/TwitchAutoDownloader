@@ -4,14 +4,16 @@ import os
 import re
 import subprocess
 import logging
+import sys
 from datetime import datetime,timedelta
 
 class TwitchDlDownloader(VideoDownloader):
     def __init__(self, twitchdl_path: str = os.path.join(os.path.dirname(os.path.abspath(__file__)), "twitch-dl")):
+        self._interpreter = sys.executable
         self._twitchdl_path = twitchdl_path
 
     def _run_command(self, *args: List[str]) -> str:
-        result = subprocess.run([self._twitchdl_path, *args], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        result = subprocess.run([self._interpreter, '-u', self._twitchdl_path, *args], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         return result.stdout.decode('utf-8')
 
     def download(self, id_or_url: str, quality: str, out_path: str):

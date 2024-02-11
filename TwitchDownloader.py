@@ -53,8 +53,8 @@ class TwitchDownloader:
         tmp_target_path_gen = lambda n : os.path.join(self._tmp_dir, id + "." + str(n) + ".mkv") # mkv extension requires less operations
         if tmp:
             # move "B" and "C" (if they exist)
-            TwitchDownloaderState.move_if_exists(tmp_target_path_gen(2), tmp_target_path_gen(1))
-            TwitchDownloaderState.move_if_exists(tmp_target_path_gen(3), tmp_target_path_gen(2))
+            TwitchDownloader.move_if_exists(tmp_target_path_gen(2), tmp_target_path_gen(1))
+            TwitchDownloader.move_if_exists(tmp_target_path_gen(3), tmp_target_path_gen(2))
             # we're writting on "C"
             target_path = tmp_target_path_gen(3)
         else:
@@ -79,6 +79,7 @@ class TwitchDownloader:
 
         logging.debug(f"Merging '{to_merge}' with '{target_path}'...")
         # TODO merge instead of this
+        VideoDownloader.move_and_reformat(target_path, os.path.join(self._videos_folder, id + ".mkv"))
         VideoDownloader.move_and_reformat(to_merge, os.path.join(self._videos_folder, "start_" + id + ".mkv"))
 
     def __tick(self):
@@ -114,6 +115,7 @@ class TwitchDownloader:
                 logging.info("The video has ended.")
 
                 self._download(self._current_video)
+                self._video_downloader.get_chat(self._current_video, self._config.chat_format, os.path.join(self._videos_folder, id + "." + self._config.chat_format))
                 if self._config.download_while_stream:
                     # we have old videos pending to merge
                     self._merge(self._current_video)

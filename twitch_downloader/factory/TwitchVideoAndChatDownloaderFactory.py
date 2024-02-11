@@ -5,6 +5,7 @@ import os
 from .TwitchDownloaderFactory import TwitchDownloaderFactory
 from ..VideoDownloader import VideoDownloader,InvalidQualityException
 from ..chat.ChatDownloader import ChatDownloader
+from ..chat.TCDChatDownloader import TCDChatDownloader
 from ..video.TwitchDlDownloader import TwitchDlDownloader
 
 class VideoAndChatDownloader(VideoDownloader):
@@ -47,4 +48,4 @@ class VideoAndChatDownloader(VideoDownloader):
 class TwitchVideoAndChatDownloaderFactory(TwitchDownloaderFactory):
     def build(self) -> VideoDownloader:
         return VideoAndChatDownloader(twitchdl_downloader=TwitchDlDownloader(),
-                                      chat_downloader=ChatDownloader())
+                                      chat_downloader=TCDChatDownloader())
