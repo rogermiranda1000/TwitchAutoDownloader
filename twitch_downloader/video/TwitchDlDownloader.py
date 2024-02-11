@@ -32,7 +32,8 @@ class TwitchDlDownloader(VideoDownloader):
         if not ok_match:
             raise Exception(result) # something wrong happened
             
-        VideoDownloader.move_and_reformat(ok_match.group(1), out_path)
+        video_path = os.path.join(os.getcwd(), ok_match.group(1)) # it will generate the file on the same folder as the MAIN script
+        VideoDownloader.move_and_reformat(video_path, out_path)
 
     @staticmethod
     def _escape_ansi(line: str):

@@ -25,8 +25,10 @@ class TwitchDownloader:
     def __init__(self, config: ConfigProvider, video_downloader_factory: VideoDownloader):
         self._config = config
         self._video_downloader = video_downloader_factory.build()
-        self._tmp_dir = tempfile.TemporaryDirectory().name
         self._start = False
+
+        self._tmp_dir = tempfile.TemporaryDirectory()
+        Path(self._tmp_dir.name).mkdir(parents=True, exist_ok=True)
 
         self._videos_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'videos')
         Path(self._videos_folder).mkdir(parents=True, exist_ok=True)
@@ -50,7 +52,7 @@ class TwitchDownloader:
         # merge it (if enabled) with the uncompleted one. In this case, we want to pick "A.mp4".
 
         target_path = os.path.join(self._videos_folder, id + ".mkv") # TODO mp4
-        tmp_target_path_gen = lambda n : os.path.join(self._tmp_dir, id + "." + str(n) + ".mkv") # mkv extension requires less operations
+        tmp_target_path_gen = lambda n : os.path.join(self._tmp_dir.name, id + "." + str(n) + ".mkv") # mkv extension requires less operations
         if tmp:
             # move "B" and "C" (if they exist)
             TwitchDownloader.move_if_exists(tmp_target_path_gen(2), tmp_target_path_gen(1))
@@ -65,12 +67,13 @@ class TwitchDownloader:
                 return # we got it
             # we weren't downloading tmp files; download the final video
 
+        logging.debug(f"Downloading into {target_path}...")
         self._video_downloader.download(id, self._config.download_quality, target_path)
 
 
     def _merge(self, id: str):
         target_path = os.path.join(self._videos_folder, id + ".mkv") # TODO mp4
-        tmp_target_path_gen = lambda n : os.path.join(self._tmp_dir, id + "." + str(n) + ".mkv")
+        tmp_target_path_gen = lambda n : os.path.join(self._tmp_dir.name, id + "." + str(n) + ".mkv")
         to_merge = tmp_target_path_gen(1)
 
         if not os.path.isfile(to_merge):
@@ -79,14 +82,13 @@ class TwitchDownloader:
 
         logging.debug(f"Merging '{to_merge}' with '{target_path}'...")
         # TODO merge instead of this
-        VideoDownloader.move_and_reformat(target_path, os.path.join(self._videos_folder, id + ".mkv"))
         VideoDownloader.move_and_reformat(to_merge, os.path.join(self._videos_folder, "start_" + id + ".mkv"))
 
     def __tick(self):
         if self._state == TwitchDownloader.TwitchDownloaderState.WAITING_FOR_VIDEO:
             # is the next video already there?
             last_id = self._video_downloader.get_last_video(self._config.channel_name)
-            last_id_info = None if last_id is None else self._video_downloader.get_info(last_id)
+            self._last_id_info = None if last_id is None else self._video_downloader.get_info(last_id)
             if last_id is not None:
                 if self._last_time < last_id_info['published']:
                     # new video found
@@ -115,14 +117,18 @@ class TwitchDownloader:
                 logging.info("The video has ended.")
 
                 self._download(self._current_video)
-                self._video_downloader.get_chat(self._current_video, self._config.chat_format, os.path.join(self._videos_folder, id + "." + self._config.chat_format))
+                self._video_downloader.get_chat(self._current_video, self._config.chat_format, os.path.join(self._videos_folder, self._current_video + "." + self._config.chat_format))
                 if self._config.download_while_stream:
                     # we have old videos pending to merge
                     self._merge(self._current_video)
 
+                # we're done with that video
+                shutil.rmtree(self._tmp_dir.name, ignore_errors=True) # clear
+                Path(self._tmp_dir.name).mkdir(parents=True, exist_ok=True)
+
                 self._current_video = None
                 self._current_video_duration = None
-                self._last_time = last_id_info['published'] # update the "last download video" time
+                self._last_time = self._last_id_info['published'] # update the "last download video" time
                 self._state = TwitchDownloader.TwitchDownloaderState.WAITING_FOR_VIDEO
         else:
             logging.warning(f"Got a tick while having unknown stage: {self._state}")
