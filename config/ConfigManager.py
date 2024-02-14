@@ -32,8 +32,9 @@ class JsonConfig(ConfigProvider):
     def _get_defaults() -> Dict[str, Any]:
         return {
             'download_while_stream': True,  # to prevent sound loss (due to copyright)
-            'check_interval': 6*60.0,       # 6 minute interval.
+            'check_interval': 12*60.0,      # 12 minute interval.
                                             # The max audio loss will be 2 times this number; check `TwitchDownloader._download` for explanation.
+                                            # Don't set it too low or it will fail due to Twitch's way to sync (eg. 6min is too low)
             'channel_name': '',             # where to download the videos
             'download_quality': '480p',     # downloaded video resolution
             'chat_format': 'srt'            # downloaded chat format
