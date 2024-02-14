@@ -6,6 +6,7 @@ import subprocess
 import logging
 import sys
 from datetime import datetime,timedelta
+from time import sleep
 
 class TwitchDlDownloader(VideoDownloader):
     def __init__(self, twitchdl_path: str = os.path.join(os.path.dirname(os.path.abspath(__file__)), "twitch-dl")):
@@ -48,22 +49,31 @@ class TwitchDlDownloader(VideoDownloader):
         r = {}
 
         id = VideoDownloader.get_id(id_or_url)
-        info = self._run_command('info', id)
-        logging.debug(f"Result of the info command: ```{info}```")
+        tries = 5
 
-        info_pattern = re.compile(r'Published\s+(\d{4}-\d{2}-\d{2})\s*@\s*(\d{2}:\d{2}:\d{2})\s+Length:\s*(.*)')
-        info_match = info_pattern.search(TwitchDlDownloader._escape_ansi(info))
-        if info_match:
-            r['published'] = datetime.strptime(info_match.group(1) + " " + info_match.group(2), '%Y-%m-%d %H:%M:%S')
+        while tries > 0:
+            info = self._run_command('info', id)
+            logging.debug(f"Result of the info command: ```{info}```")
 
-            # examples of length:
-            # 47 h 59 min
-            # 3 h 14 min
-            # 35 min 46 sec
-            length_pattern = re.compile(r'(?:(\d+) h)?\s*(\d+) min')
-            length_match = length_pattern.search(info_match.group(3))
-            if length_match:
-                r['length'] = timedelta(minutes=int(length_match.group(2)), hours=int("0" if length_match.group(1) is None else length_match.group(1)))
+            info_pattern = re.compile(r'Published\s+(\d{4}-\d{2}-\d{2})\s*@\s*(\d{2}:\d{2}:\d{2})\s+Length:\s*(.*)')
+            info_match = info_pattern.search(TwitchDlDownloader._escape_ansi(info))
+            if info_match:
+                r['published'] = datetime.strptime(info_match.group(1) + " " + info_match.group(2), '%Y-%m-%d %H:%M:%S')
+
+                # examples of length:
+                # 47 h 59 min
+                # 3 h 14 min
+                # 35 min 46 sec
+                length_pattern = re.compile(r'(?:(\d+) h)?\s*(\d+) min')
+                length_match = length_pattern.search(info_match.group(3))
+                if length_match:
+                    r['length'] = timedelta(minutes=int(length_match.group(2)), hours=int("0" if length_match.group(1) is None else length_match.group(1)))
+
+                return r # we're done
+
+            # something went wrong while fetching; try again later
+            sleep(2)
+            tries -= 1
 
         return r
 
