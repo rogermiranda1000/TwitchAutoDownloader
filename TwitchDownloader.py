@@ -80,6 +80,14 @@ class TwitchDownloader:
             logging.debug("Nothing to merge.")
             return
 
+        # make sure `target_path` exists
+        if not os.path.isfile(target_path):
+            logging.debug(f"Couldn't merge as {target_path} doesn't exist.")
+            # at least keep the temporal
+            VideoDownloader.move_and_reformat(to_merge, os.path.join(self._videos_folder, "start_" + id + ".mkv"))
+            return
+
+        # merge the temporal with the final file
         logging.debug(f"Merging '{to_merge}' with '{target_path}'...")
         # TODO merge instead of this
         VideoDownloader.move_and_reformat(to_merge, os.path.join(self._videos_folder, "start_" + id + ".mkv"))
@@ -103,7 +111,7 @@ class TwitchDownloader:
                     logging.debug("No new video got.")
         elif self._state == TwitchDownloader.TwitchDownloaderState.CAPTURING:
             current_video_info = self._video_downloader.get_info(self._current_video)
-            if self._current_video_duration < current_video_info['length']:
+            if 'length' in current_video_info and self._current_video_duration < current_video_info['length']:
                 # got new data
                 logging.debug(f"The stream is still going.")
                 
@@ -113,11 +121,16 @@ class TwitchDownloader:
                     
                 self._current_video_duration = current_video_info['length'] # update the current downloaded length
             else:
-                # the video has ended
+                # the video has ended/has been removed
                 logging.info("The video has ended.")
 
-                self._download(self._current_video)
-                self._video_downloader.get_chat(self._current_video, self._config.chat_format, os.path.join(self._videos_folder, self._current_video + "." + self._config.chat_format))
+                try:
+                    self._download(self._current_video)
+                    self._video_downloader.get_chat(self._current_video, self._config.chat_format, os.path.join(self._videos_folder, self._current_video + "." + self._config.chat_format))
+                except Exception as ex:
+                    # just in case the video was removed; we want to keep the tmp file
+                    logging.critical(ex, exc_info=True)
+
                 if self._config.download_while_stream:
                     # we have old videos pending to merge
                     self._merge(self._current_video)
