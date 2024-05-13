@@ -1,0 +1,11 @@
+version: '3'
+services:
+  twitch-downloader:
+    build:
+      context: ../
+      dockerfile: ./docker/Dockerfile
+    container_name: twitch-downloader
+    volumes:
+      - ../config.json:/TwitchAutoDownloader/config.json
+      - ../videos:/TwitchAutoDownloader/videos
+    restart: unless-stopped
